@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import socket from '../socket';
 import AppHeader from '../components/AppHeader';
@@ -22,15 +22,17 @@ const ViewerPage = () => {
   const [toasts, setToasts] = useState([]);
   
   const stationaryTimerRef = useRef(null);
+  const pollIntervalRef = useRef(null);
+  const hasReceivedWebSocket = useRef(false);
 
-  const addToast = (message, type = 'info') => {
-    const id = Date.now();
+  const addToast = useCallback((message, type = 'info') => {
+    const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
-  };
+  }, []);
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth radius in km
+  const calculateDistance = useCallback((lat1, lon1, lat2, lon2) => {
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -38,24 +40,110 @@ const ViewerPage = () => {
               Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
-  };
+  }, []);
+
+  // Apply location data from any source (WebSocket or HTTP polling)
+  const applyLocationData = useCallback((lat, lng, ts, accuracy, speed, heading, trail) => {
+    setLastCoords({ lat, lng, accuracy, speed, heading });
+    setLastSeen(new Date(ts || Date.now()));
+    setStatus('active');
+    setSenderOnline(true);
+    
+    if (trail && trail.length > 0) {
+      setTrailPoints(trail);
+      const start = trail[0];
+      setDistanceKm(calculateDistance(start[0], start[1], lat, lng));
+    } else {
+      setTrailPoints(prev => {
+        const nextTrail = [...prev, [lat, lng]];
+        if (nextTrail.length > 1) {
+          const start = nextTrail[0];
+          setDistanceKm(calculateDistance(start[0], start[1], lat, lng));
+        }
+        return nextTrail;
+      });
+    }
+  }, [calculateDistance]);
 
   // Reset the stationary arrival timer on each movement update
-  const resetStationaryTimer = () => {
+  const resetStationaryTimer = useCallback(() => {
     if (stationaryTimerRef.current) {
       clearTimeout(stationaryTimerRef.current);
     }
-    // If no new movement is received for 120 seconds, mark as arrived
     stationaryTimerRef.current = setTimeout(() => {
       setStatus(prev => (prev === 'active' ? 'arrived' : prev));
       addToast('🔵 Rocky has arrived or stopped moving', 'info');
     }, 120 * 1000);
-  };
+  }, [addToast]);
 
+  // ========================
+  // HTTP POLLING FALLBACK
+  // Polls /api/room/:roomId/poll every 5 seconds while stuck in 'waiting'
+  // Guarantees the viewer will NEVER be stuck forever even if WebSocket fails
+  // ========================
+  useEffect(() => {
+    if (!roomId) return;
+
+    const pollRoom = async () => {
+      // Stop polling once real-time WebSocket events are flowing
+      if (hasReceivedWebSocket.current) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/room/${roomId}/poll`);
+        if (!res.ok) return;
+        
+        const data = await res.json();
+        console.log('[Poll] Room state:', data.status, 'hasLocation:', !!data.lastKnown);
+        
+        if (data.lastKnown && data.lastKnown.lat !== undefined) {
+          console.log('[Poll] ✅ Got location via HTTP fallback — WebSocket was not delivering');
+          const { lat, lng, ts, accuracy, speed, heading } = data.lastKnown;
+          applyLocationData(lat, lng, ts, accuracy, speed, heading, data.trail);
+          resetStationaryTimer();
+          addToast('📡 Connected via HTTP fallback', 'success');
+          
+          // Stop polling — we have data now
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        } else if (data.senderConnected) {
+          setSenderOnline(true);
+        }
+      } catch (err) {
+        console.warn('[Poll] HTTP fallback error:', err.message);
+      }
+    };
+
+    // Start polling after 3 seconds if still waiting
+    const startDelay = setTimeout(() => {
+      pollRoom(); // first poll immediately
+      pollIntervalRef.current = setInterval(pollRoom, 5000);
+    }, 3000);
+
+    return () => {
+      clearTimeout(startDelay);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [roomId, applyLocationData, resetStationaryTimer, addToast]);
+
+  // ========================
+  // WEBSOCKET EVENT LISTENERS
+  // ========================
   useEffect(() => {
     if (!roomId) return;
 
     const join = () => {
+      console.log('[Viewer] Emitting join-room for:', roomId);
       socket.emit('join-room', { roomId, role: 'viewer' });
     };
 
@@ -65,21 +153,16 @@ const ViewerPage = () => {
     socket.on('connect', join);
 
     const handleRoomInit = (snapshot) => {
+      console.log('[Viewer] Received room-init:', snapshot?.status, 'hasLocation:', !!snapshot?.lastKnown);
       if (!snapshot) return;
+      hasReceivedWebSocket.current = true;
       setSenderOnline(!!snapshot.senderConnected);
       
       if (snapshot.lastKnown) {
         const { lat, lng, ts, accuracy, speed, heading } = snapshot.lastKnown;
-        setLastCoords({ lat, lng, accuracy, speed, heading });
-        setLastSeen(new Date(ts || Date.now()));
-        setStatus('active');
-        if (snapshot.trail && snapshot.trail.length > 0) {
-          setTrailPoints(snapshot.trail);
-          const start = snapshot.trail[0];
-          setDistanceKm(calculateDistance(start[0], start[1], lat, lng));
-        }
+        applyLocationData(lat, lng, ts, accuracy, speed, heading, snapshot.trail);
         resetStationaryTimer();
-      } else if (snapshot.status) {
+      } else if (snapshot.status && snapshot.status !== 'waiting') {
         setStatus(snapshot.status);
       }
     };
@@ -88,18 +171,19 @@ const ViewerPage = () => {
       const { lat, lng, ts = Date.now(), accuracy, speed, heading } = data || {};
       if (lat === undefined || lng === undefined) return;
 
-      const newPoint = [lat, lng];
+      console.log('[Viewer] 📍 Live location-update received');
+      hasReceivedWebSocket.current = true;
+
       setLastCoords({ lat, lng, accuracy, speed, heading });
       setLastSeen(new Date(ts));
       setStatus('active');
       setSenderOnline(true);
       
       setTrailPoints(prev => {
-        const nextTrail = [...prev, newPoint];
+        const nextTrail = [...prev, [lat, lng]];
         if (nextTrail.length > 1) {
           const start = nextTrail[0];
-          const dist = calculateDistance(start[0], start[1], lat, lng);
-          setDistanceKm(dist);
+          setDistanceKm(calculateDistance(start[0], start[1], lat, lng));
         }
         return nextTrail;
       });
@@ -108,17 +192,20 @@ const ViewerPage = () => {
     };
 
     const handleMonitoringStarted = () => {
+      hasReceivedWebSocket.current = true;
       setSenderOnline(true);
-      addToast('🚀 Rocky started monitoring! Waiting for first GPS ping...', 'info');
+      addToast('🚀 Rocky started monitoring!', 'info');
     };
 
     const handleMonitoringStopped = () => {
+      hasReceivedWebSocket.current = true;
       setStatus('stopped');
       if (stationaryTimerRef.current) clearTimeout(stationaryTimerRef.current);
       addToast('⚫ Monitoring Ended by Sender', 'info');
     };
 
     const handleSenderStatus = (info) => {
+      hasReceivedWebSocket.current = true;
       setSenderOnline(!!info?.connected);
       if (info?.connected) {
         addToast('🟢 Rocky is online', 'info');
@@ -127,16 +214,9 @@ const ViewerPage = () => {
 
     const handleLastKnown = (data) => {
       if (data && data.lat !== undefined && data.lng !== undefined) {
+        hasReceivedWebSocket.current = true;
         const { lat, lng, ts, accuracy, speed, heading, trail } = data;
-        setLastCoords({ lat, lng, accuracy, speed, heading });
-        setLastSeen(new Date(ts || Date.now()));
-        setStatus('active');
-        setSenderOnline(true);
-        if (trail && trail.length > 0) {
-          setTrailPoints(trail);
-        } else {
-          setTrailPoints(prev => prev.length > 0 ? prev : [[lat, lng]]);
-        }
+        applyLocationData(lat, lng, ts, accuracy, speed, heading, trail);
         resetStationaryTimer();
       }
     };
@@ -165,7 +245,7 @@ const ViewerPage = () => {
       socket.off('last-known', handleLastKnown);
       socket.off('reconnect', handleReconnect);
     };
-  }, [roomId]);
+  }, [roomId, applyLocationData, resetStationaryTimer, addToast, calculateDistance]);
 
   if (!roomId) {
     return (

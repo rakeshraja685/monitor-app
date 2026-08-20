@@ -45,9 +45,15 @@ const SenderPage = () => {
   }, [roomId, searchParams, setSearchParams]);
 
   // Join room as sender immediately on mount and on reconnect
+  // CRITICAL: if we reconnect while monitoring is active (e.g. server restart),
+  // re-emit 'monitoring-started' so the server and viewers know we're still tracking.
   useEffect(() => {
     const join = () => {
       socket.emit('join-room', { roomId, role: 'sender' });
+      // Re-announce monitoring state on reconnect
+      if (watchId.current) {
+        socket.emit('monitoring-started', { roomId });
+      }
     };
 
     if (socket.connected) {

@@ -62,13 +62,31 @@ class RoomManager {
   }
 
   /**
-   * Updates location for an active room session
+   * Updates location for an active room session.
+   * DEFENSIVE: auto-creates the room if it was garbage-collected mid-session
+   * (e.g., after server restart while sender was actively tracking).
+   * 
    * @param {string} roomId 
-   * @param {object} locationData { lat, lng, ts, accuracy, speed }
+   * @param {object} locationData { lat, lng, ts, accuracy, speed, heading }
    */
   updateLocation(roomId, locationData) {
-    const room = this.rooms.get(roomId);
-    if (!room) return null;
+    let room = this.rooms.get(roomId);
+    
+    // Auto-create room if it doesn't exist (server restart recovery)
+    if (!room) {
+      console.log(`[RoomManager] Auto-creating room ${roomId} from location event`);
+      room = {
+        roomId,
+        status: 'active',
+        createdAt: Date.now(),
+        lastUpdated: Date.now(),
+        senderSocketId: null,
+        viewerSocketIds: new Set(),
+        lastKnown: null,
+        trail: []
+      };
+      this.rooms.set(roomId, room);
+    }
 
     const { lat, lng, ts = Date.now(), accuracy, speed, heading } = locationData;
     const cleanLocation = { lat, lng, ts, accuracy, speed, heading };
