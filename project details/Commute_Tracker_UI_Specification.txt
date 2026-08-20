@@ -1,0 +1,706 @@
+🎨
+UI SPECIFICATION
+Commute Tracker — Real-Time Location Sharing App
+Every UI element · Socket.io binding · State logic · Component map
+Screens Covered:  Sender  ·  Viewer  ·  Shared Components
+React 18  ·  Leaflet.js  ·  Socket.io-client  ·  CSS Modules
+1. UI Overview
+This document defines every UI element in the Commute Tracker app — what it looks like, what state it holds, and which Socket.io event it connects to. Use this as the build reference alongside the Tech Stack document.
+Property
+Value
+Total Screens
+2 — SenderPage and ViewerPage
+Shared Components
+4 — Header, StatusBadge, ConnectionChip, RoomCodeDisplay
+Socket.io Events
+5 — join-room, location, location-update, monitoring-stopped, reconnect
+State Variables
+8 across both screens
+Map Library
+Leaflet.js via React-Leaflet — no Google Maps API key needed
+Routing
+React Router v6 — /sender and /viewer as separate routes
+2. Global Design System
+Apply these values consistently across both screens. Define them as CSS custom properties in index.css so every component uses the same values.
+2.1 Color Palette
+CSS Variable
+Hex Value
+Usage
+--color-primary
+#2563EB
+Buttons, active states, links
+--color-primary-dark
+#1D4ED8
+Button hover state
+--color-success
+#16A34A
+Active monitoring, green status
+--color-danger
+#DC2626
+Stop button, error states
+--color-warning
+#EA580C
+Battery saver mode indicator
+--color-surface
+#F8FAFC
+Page background
+--color-card
+#FFFFFF
+Card / panel background
+--color-border
+#E2E8F0
+All borders and dividers
+--color-text-main
+#1B2A4A
+Headings, labels
+--color-text-body
+#475569
+Body text, descriptions
+--color-text-muted
+#94A3B8
+Timestamps, secondary info
+2.2 Typography
+Role
+Style
+Where Used
+Display / App Name
+Calibri Bold, 22px
+Header bar app name
+Section Heading
+Calibri Bold, 18px
+Screen section labels
+Label
+Calibri SemiBold, 14px
+Button labels, field labels
+Body
+Calibri Regular, 14px
+Status text, descriptions
+Mono / Code
+Courier New, 13px
+Room code display, GPS coords
+Timestamp
+Calibri Regular, 12px
+Last seen time, small labels
+2.3 Spacing & Radius
+Variable
+Value
+Usage
+--radius-sm
+6px
+Chips, badges, small tags
+--radius-md
+10px
+Cards, panels, input fields
+--radius-lg
+16px
+Modal sheets, map overlays
+--radius-full
+9999px
+Pill buttons, status dots
+--space-xs
+4px
+Icon gap, inline spacing
+--space-sm
+8px
+Between related elements
+--space-md
+16px
+Section internal padding
+--space-lg
+24px
+Between major sections
+3. Shared Components
+These components appear on both the Sender and Viewer screens. Build them once and import where needed.
+3.1 AppHeader
+Wireframe — AppHeader
++--------------------------------------------------+
+|  📍  Commute Tracker          [room: abc-123]   |
++--------------------------------------------------+
+Element
+Appearance
+Behaviour / Props
+App Icon
+📍 emoji or SVG pin icon — 20px
+Static — always visible
+App Name
+"Commute Tracker" — Display font, navy
+Static label
+Room Code Chip
+Pill tag showing the room ID — monospace font
+Props: roomId (string)
+Background
+White (#FFFFFF) with bottom border --color-border
+Sticky top position
+Height
+56px fixed
+Consistent across both screens
+💡 Note: The room code chip should be tappable — tapping it copies the viewer URL to clipboard and briefly shows a "Copied!" toast.
+3.2 ConnectionChip
+State
+Appearance
+Trigger
+Connected
+Green dot + "Connected" text — --color-success
+socket.connected === true
+Reconnecting
+Orange dot + "Reconnecting..." text — --color-warning
+Socket.io reconnect event firing
+Disconnected
+Red dot + "Disconnected" text — --color-danger
+socket.connected === false
+Position
+Top-right corner of the header bar
+Fixed placement
+Socket event
+Updates on: connect, disconnect, reconnect_attempt
+useEffect listener on socket
+💡 Note: This chip tells both Rocky and Mom that the WebSocket is live. If it shows Disconnected, location data is not flowing.
+3.3 StatusBadge
+State
+Appearance
+When Shown
+Active
+Pulsing green pill — "🟢 Monitoring Active"
+isMonitoring === true on sender / data flowing on viewer
+Stopped
+Grey pill — "⚫ Stopped"
+isMonitoring === false
+Arrived
+Blue pill — "🔵 Arrived"
+movement stops > 2 minutes
+Pulse anim
+CSS @keyframes pulse on the green dot only
+Only when Active state
+Socket.io binding — StatusBadge (Viewer side)
+  socket.on('monitoring-stopped', () => setStatus('stopped'));
+  socket.on('location-update',    () => setStatus('active'));
+  // No movement for 120s → setStatus('arrived') via local timer
+4. Sender Screen  —  /sender
+This is the screen Rocky opens on his phone. It is intentionally minimal — one primary action (Start/Stop), clear status, and the share link. Optimized for one-handed mobile use.
+4.1 Wireframe
+Sender Screen — Mobile Layout (375px wide)
++--------------------------------------------+
+|  📍 Commute Tracker    [room: abc-123]  🟢 |
++--------------------------------------------+
+|                                            |
+|           [  GPS Accuracy: 12m  ]          |
+|                                            |
+|        +---------------------------+       |
+|        |                           |       |
+|        |     ●  START MONITORING   |       |
+|        |                           |       |
+|        +---------------------------+       |
+|                                            |
+|   🟢 Monitoring Active — 3:42 PM           |
+|   📍 12.9716° N, 80.2209° E               |
+|                                            |
+|   [ 📋 Copy Viewer Link ]                  |
+|   [ 🔋 Battery Saver: OFF ]  (toggle)      |
+|                                            |
++--------------------------------------------+
+4.2 State Variables (SenderPage.jsx)
+Variable
+Type
+Default
+Purpose
+isMonitoring
+boolean
+false
+Controls GPS watch and button appearance
+watchId
+number|null
+null
+ID from watchPosition() — needed to call clearWatch()
+currentCoords
+{lat,lng}|null
+null
+Last GPS reading — displayed as coordinate text
+accuracy
+number|null
+null
+GPS accuracy in metres — shown in accuracy chip
+batterySaver
+boolean
+false
+When true — emit every 30s instead of 5s
+status
+string
+"idle"
+idle | monitoring | stopped
+startTime
+Date|null
+null
+When monitoring started — for elapsed time display
+roomId
+string
+auto-gen
+Random room code — generated on page load
+4.3 UI Elements — Full Specification
+A. GPS Accuracy Chip
+Property
+Detail
+Appearance
+Small pill — "GPS: 12m" — green if < 20m, orange if 20-50m, red if > 50m
+Position
+Centered above the main button
+Updates
+Every GPS callback from watchPosition()
+Hidden
+When isMonitoring is false (not tracking yet)
+B. Start / Stop Button  ← MAIN ACTION
+Property
+Detail
+Idle state
+Large rounded button — blue (#2563EB) — "● Start Monitoring"
+Active state
+Large rounded button — red (#DC2626) — "■ Stop Monitoring"
+Size
+Full width on mobile — min height 72px — prominent tap target
+Icon
+Filled circle ● for Start, filled square ■ for Stop
+Disabled
+Grey and unclickable while GPS permission is being requested
+Transition
+Background color transition 200ms ease on state change
+On click (Start)
+Request GPS permission → call watchPosition() → emit join-room → set isMonitoring true
+On click (Stop)
+Call clearWatch(watchId) → emit monitoring-stopped → set isMonitoring false
+Socket.io events fired by Start / Stop button
+  START clicked:
+    socket.emit('join-room', { roomId, role: 'sender' });
+  GPS fires (every 5s or 30s):
+    socket.emit('location', { roomId, lat, lng, ts: Date.now() });
+  STOP clicked:
+    socket.emit('monitoring-stopped', { roomId });
+    navigator.geolocation.clearWatch(watchId);
+C. Status Text Line
+State
+Text / Appearance
+Idle
+Nothing shown — hide this element
+Active
+"🟢 Monitoring Active — started at 3:42 PM"
+Stopped
+"⚫ Stopped — last sent at 3:58 PM"
+Font
+Body size, --color-text-body, left-aligned below button
+D. Current Coordinates Display
+Property
+Detail
+Content
+"📍 12.9716° N, 80.2209° E" — updates with every GPS reading
+Font
+Courier New monospace — 13px — --color-text-muted
+Visibility
+Only shown when isMonitoring is true
+Purpose
+Confirms to Rocky that GPS is actually reading correctly
+E. Copy Viewer Link Button
+Property
+Detail
+Label
+"📋 Copy Viewer Link"
+Style
+Secondary outlined button — border --color-primary, text --color-primary
+On click
+navigator.clipboard.writeText(viewerUrl) → show "✅ Copied!" toast for 2 seconds
+viewerUrl
+https://[railway-url]/viewer?room=[roomId]
+Visibility
+Always visible once the room is created (page load)
+F. Battery Saver Toggle
+Property
+Detail
+Label
+"🔋 Battery Saver"
+Style
+iOS-style toggle switch — off = grey, on = --color-warning (orange)
+Off state
+Emits GPS every 5 seconds (default)
+On state
+Emits GPS every 30 seconds — adds "(30s interval)" label next to toggle
+State var
+batterySaver boolean — controls maximumAge in watchPosition options
+Placement
+Below the Copy Link button — secondary priority element
+5. Viewer Screen  —  /viewer?room=[roomId]
+This is the screen Mom opens. The map takes up most of the screen. A slide-up info panel sits at the bottom with status, last seen time, and distance. Optimised for passive monitoring — Mom should not need to interact much.
+5.1 Wireframe
+Viewer Screen — Mobile Layout (375px wide)
++--------------------------------------------+
+|  📍 Commute Tracker    [room: abc-123]  🟢 |
++--------------------------------------------+
+|                                            |
+|   [ Full screen Leaflet Map ]              |
+|                                            |
+|        🔵← (route trail line)              |
+|              📍 (live marker)              |
+|                                            |
+|   [+]  zoom controls (Leaflet built-in)    |
+|   [-]                                      |
+|                                            |
++--------------------------------------------+
+|  🟢 Monitoring Active                      |
+|  Last updated: 3:42:05 PM                  |
+|  Distance from start: 3.2 km               |
+|  Current coords: 12.9716° N, 80.2209° E    |
++--------------------------------------------+
+5.2 State Variables (ViewerPage.jsx)
+Variable
+Type
+Default
+Purpose
+status
+string
+"waiting"
+waiting | active | stopped | arrived
+lastCoords
+{lat,lng}|null
+null
+Most recent coordinates received
+lastSeen
+Date|null
+null
+Timestamp of last location-update event
+trailPoints
+Array
+[]
+All past coords — used to draw polyline
+distanceKm
+number
+0
+Haversine distance from first coord to current
+roomId
+string
+from URL
+Parsed from ?room= query param on mount
+5.3 UI Elements — Full Specification
+A. Leaflet Map (Full Screen)
+Property
+Detail
+Library
+react-leaflet MapContainer + TileLayer
+Tile source
+https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png (free, no key)
+Initial zoom
+14 — city street level
+Auto-pan
+map.panTo([lat, lng]) called on every location-update event
+Height
+calc(100vh - 56px header - 120px bottom panel) — fills the screen
+Attribution
+OpenStreetMap attribution shown (required by OSM licence)
+Controls
+Leaflet default zoom buttons — bottom right position
+B. Live Location Marker
+Property
+Detail
+Icon
+Custom circular blue dot — 18px diameter — CSS: border-radius 50%
+Pulse ring
+Animated expanding ring around the dot — CSS @keyframes ripple
+Behaviour
+marker.setLatLng([lat, lng]) on every location-update
+Popup
+Click marker → popup shows "Rocky — last seen 3:42 PM"
+Created
+On first location-update — markerRef.current = L.marker([lat,lng])
+Destroyed
+When monitoring-stopped received — marker remains at last position
+Socket.io binding — Live Marker
+  socket.on('location-update', ({ lat, lng, ts }) => {
+    setLastCoords({ lat, lng });
+    setLastSeen(new Date(ts));
+    setStatus('active');
+    if (!markerRef.current) {
+      markerRef.current = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+    } else {
+      markerRef.current.setLatLng([lat, lng]);
+    }
+    map.panTo([lat, lng]);
+    trailPoints.push([lat, lng]);
+    polylineRef.current.setLatLngs(trailPoints);
+    updateDistance();
+  });
+C. Route Trail Polyline
+Property
+Detail
+Library
+L.polyline(trailPoints, options).addTo(map)
+Color
+#2563EB (--color-primary) — matches the marker dot
+Weight
+3px stroke width
+Opacity
+0.65 — semi-transparent so map is still readable
+Dash pattern
+None — solid line
+Updates
+polylineRef.current.setLatLngs(trailPoints) on every location event
+Clears
+On page refresh — trail is not persisted (in-memory only)
+D. Bottom Info Panel
+Property
+Detail
+Position
+Fixed bottom — slide up from screen edge
+Height
+120px collapsed — enough for status + last seen + distance
+Background
+White with top border and subtle shadow
+Border radius
+16px top corners (--radius-lg)
+Status badge
+StatusBadge component — Active / Stopped / Arrived
+Last seen
+"Last updated: 3:42:05 PM" — updates every location-update event
+Distance
+"Distance from start: 3.2 km" — Haversine formula on each update
+Coordinates
+"12.9716° N, 80.2209° E" — monospace — updates live
+Waiting state
+Shows "Waiting for Rocky to start monitoring..." when status = waiting
+E. Waiting State (before monitoring starts)
+Property
+Detail
+Map
+Renders blank — centered on Chennai (13.0827, 80.2707) as default
+Overlay
+Centered card on the map — "⏳ Waiting for Rocky to start monitoring..."
+Animation
+Spinning loader icon inside the card
+Bottom panel
+Shows "No location yet" with muted text
+Triggered by
+status === "waiting" — default state on page load
+Resolves when
+First 'location-update' socket event arrives
+6. Socket.io Event Map
+Every UI element that connects to the backend must listen to or emit one of these events. Use this table as the wiring reference when coding each component.
+6.1 Events Emitted by Sender
+Event Name
+Fired From
+Payload
+Server Action
+join-room
+SenderPage — on Start click
+{ roomId, role: "sender" }
+Server adds sender to Socket.io room
+location
+GPS watchPosition callback
+{ roomId, lat, lng, ts }
+Server broadcasts to all viewers in room
+monitoring-stopped
+SenderPage — on Stop click
+{ roomId }
+Server emits to viewers — triggers status update
+6.2 Events Emitted by Viewer
+Event Name
+Fired From
+Payload
+Server Action
+join-room
+ViewerPage — on mount (useEffect)
+{ roomId, role: "viewer" }
+Server adds viewer to room — sends last known location if available
+6.3 Events Received by Viewer (from server)
+Event
+UI Action on ViewerPage
+location-update
+Updates marker, polyline, bottom panel, last seen time, distance
+monitoring-stopped
+Sets status to "stopped" — marker stays at last position
+last-known
+Sent by server on join if sender already active — pre-fills map on late join
+connect
+Updates ConnectionChip to green "Connected"
+disconnect
+Updates ConnectionChip to red "Disconnected"
+reconnect
+Updates ConnectionChip to orange "Reconnecting..." during retry
+7. Component Tree
+This is the React component hierarchy. Build bottom-up — shared components first, then compose into pages.
+React Component Tree
+App.jsx  (React Router root)
+  │
+  ├── /sender  →  SenderPage.jsx
+  │       ├── AppHeader.jsx
+  │       │       └── ConnectionChip.jsx
+  │       │       └── RoomCodeChip.jsx
+  │       ├── GpsAccuracyChip.jsx
+  │       ├── MonitorButton.jsx          ← main Start/Stop button
+  │       ├── StatusText.jsx
+  │       ├── CoordinatesDisplay.jsx
+  │       ├── CopyLinkButton.jsx
+  │       └── BatterySaverToggle.jsx
+  │
+  └── /viewer  →  ViewerPage.jsx
+          ├── AppHeader.jsx
+          │       └── ConnectionChip.jsx
+          │       └── RoomCodeChip.jsx
+          ├── MapView.jsx                ← Leaflet MapContainer
+          │       ├── LiveMarker.jsx     ← custom marker + popup
+          │       └── RouteTrail.jsx     ← Polyline component
+          ├── WaitingOverlay.jsx         ← shown before first location
+          └── BottomInfoPanel.jsx
+                  ├── StatusBadge.jsx
+                  ├── LastSeenLabel.jsx
+                  ├── DistanceLabel.jsx
+                  └── CoordinatesDisplay.jsx
+Build Order Recommendation
+Step
+Component
+Notes
+Step 1
+socket.js
+Socket.io client singleton — used by all components
+Step 2
+AppHeader.jsx
+Static shell — no socket yet
+Step 3
+ConnectionChip.jsx
+Connects to socket connect/disconnect events
+Step 4
+SenderPage.jsx
+GPS + Start/Stop button + emit location
+Step 5
+ViewerPage.jsx
+Join room + listen for location-update
+Step 6
+MapView.jsx
+Leaflet map — wire to ViewerPage state
+Step 7
+LiveMarker.jsx
+Custom marker — update on location-update
+Step 8
+RouteTrail.jsx
+Polyline — append on every update
+Step 9
+BottomInfoPanel.jsx
+Status, last seen, distance — pull from ViewerPage state
+Step 10
+BatterySaverToggle
+Toggle GPS interval — sender side only
+8. Responsive & Mobile Rules
+Both screens are used on mobile phones. The Sender screen is used by Rocky (phone). The Viewer screen is used by Mom (phone or tablet). Design mobile-first.
+Rule
+Detail
+Base layout
+Mobile first — 375px min width target (iPhone SE)
+Breakpoint
+@media (min-width: 768px) for tablet/desktop adjustments
+Touch targets
+All buttons min 48x48px — main Start/Stop button 72px tall
+Sender on desktop
+Centered card — max-width 420px — same layout, just centered
+Viewer on desktop
+Map fills the window — bottom panel becomes a sidebar (768px+)
+Font scaling
+Use rem units — do not use px for font sizes
+Map on mobile
+Full viewport height minus header and bottom panel
+Map on desktop
+Full viewport height minus header — panel is sidebar
+Zoom controls
+Leaflet default — bottom right — fine on both screen sizes
+iOS GPS note
+GPS stops when screen locks on iOS — warn Rocky to keep screen on
+8.1 iOS / Android Specific Notes
+Important Mobile Gotchas
+  iOS Safari: GPS (watchPosition) pauses when the screen locks or the tab goes to background.
+  Fix: Add a banner on SenderPage — "Keep your screen on while monitoring is active."
+  Android Chrome: GPS works in background tabs but may throttle after a few minutes.
+  Fix: Battery saver toggle gives a manual workaround (30s intervals use less power).
+  Both: HTTPS is required for the Geolocation API. Railway gives HTTPS by default — no issue.
+  Safari on iOS: Geolocation permission prompt appears on first click only.
+  Fix: Trigger watchPosition inside the button click handler, not on page load.
+9. Error & Edge Case UI
+Every error state needs a UI response. Define them here so nothing is left as a blank screen.
+Error / Edge Case
+Screen
+UI Response
+GPS permission denied
+Sender
+Show red banner — "Location permission denied. Please enable in browser settings." — disable Start button
+GPS timeout
+Sender
+Show orange banner — "GPS signal lost. Retrying..." — keep isMonitoring true, retry watchPosition
+Socket disconnected
+Both
+ConnectionChip turns red — Sender queues last location and re-emits on reconnect — Viewer shows "Reconnecting..."
+Room not found
+Viewer
+Show full-screen card — "Room not found or expired. Ask Rocky to share a new link."
+No GPS on device
+Sender
+On page load check navigator.geolocation — if undefined, show error — "GPS not available in this browser."
+Viewer joins late
+Viewer
+Server sends last-known event on join — map pre-fills with Rocky's last position automatically
+Low accuracy GPS
+Sender
+GPS accuracy chip turns red if > 50m — show tooltip "Move to open area for better accuracy"
+10. Toast Notifications
+Toasts are small temporary pop-up messages at the top of the screen. They disappear after 2-3 seconds. Use them for confirmations and non-critical alerts.
+Message
+Duration
+Color
+Trigger
+✅ Link Copied
+2s
+Green
+After tapping Copy Viewer Link button
+📍 Monitoring Started
+3s
+Green
+After Start button is pressed and GPS confirms
+⚫ Monitoring Stopped
+2s
+Grey
+After Stop button is pressed
+🔁 Reconnected
+2s
+Blue
+Socket.io reconnect succeeds
+⚠️ GPS Signal Weak
+4s
+Orange
+GPS accuracy drops below 50m threshold
+❌ GPS Lost
+4s
+Red
+watchPosition error callback fires
+💡 Note: Build one reusable Toast component with props: message, duration, type (success/warning/error/info). Keep it simple — no external library needed.
+11. CSS File Structure
+Use CSS Modules — one .module.css file per component. Global variables go in index.css.
+CSS Modules File Map
+client/src/
+  ├── index.css                  ← CSS custom properties (colors, spacing, radius)
+  ├── pages/
+  │   ├── SenderPage.module.css
+  │   └── ViewerPage.module.css
+  └── components/
+      ├── AppHeader.module.css
+      ├── MonitorButton.module.css
+      ├── ConnectionChip.module.css
+      ├── StatusBadge.module.css
+      ├── MapView.module.css
+      ├── BottomInfoPanel.module.css
+      ├── BatterySaverToggle.module.css
+      ├── CopyLinkButton.module.css
+      └── Toast.module.css
+File / Rule
+Notes
+index.css
+All CSS custom properties — colors, spacing, radius, fonts — imported once in main.jsx
+.module.css files
+Component-scoped styles — classnames auto-prefixed — no global leaks
+Animations
+Define @keyframes in the component file that uses them — e.g. pulse in StatusBadge.module.css
+No Tailwind
+Tailwind is overkill for this project size — plain CSS Modules keep it readable
+Leaflet CSS
+Import leaflet/dist/leaflet.css in main.jsx — required for map to render correctly
+— End of UI Specification —
+Rocky · Commute Tracker UI Spec v1.0 · Chennai, India · 2026

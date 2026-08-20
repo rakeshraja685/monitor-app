@@ -1,0 +1,21 @@
+{
+  "name": "Commute Tracker",
+  "short_name": "Tracker",
+  "description": "Real-time location sharing and commute monitoring web app",
+  "start_url": "/sender",
+  "display": "standalone",
+  "background_color": "#f7f9fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

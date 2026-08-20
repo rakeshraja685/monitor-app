@@ -1,0 +1,359 @@
+📍
+COMMUTE TRACKER
+Real-Time Location Sharing App — Full Technical Document
+Version 1.0  |  Fresher Project  |  Chennai, India
+Stack: React · Node.js · Socket.io · Leaflet · Railway
+1. Project Overview
+Commute Tracker is a lightweight real-time location sharing web app. When you press "Start Monitoring" on your phone, your live GPS coordinates are sent to a server and instantly displayed on a map that your mom can watch on her own device — no app install needed on either side.
+Property
+Value
+App Name
+Commute Tracker
+Purpose
+Real-time commute monitoring between sender and viewer
+Users
+2 — Sender (Rocky) and Viewer (Mom)
+Platform
+Web browser — works on mobile and desktop
+Network
+Requires internet connection on both sides
+App Install
+None — just a URL
+How It Works
+Rocky opens the Sender screen on his phone browser
+Presses "Start Monitoring" — browser starts reading GPS every 5 seconds
+Each GPS coordinate is sent to the Node.js server via WebSocket
+Server instantly pushes the coordinate to Mom's viewer screen
+Mom sees a live moving marker on the map — no refresh needed
+Rocky presses "Stop" when he arrives — Mom sees status update
+2. Complete Tech Stack
+Every technology chosen here is free, open-source, and beginner-friendly. No paid APIs, no complex configs.
+2.1 Frontend
+Technology
+Purpose / Reason
+React 18
+UI framework — builds the Sender and Viewer screens as components
+Vite
+Build tool — fast dev server and production bundler, replaces Create React App
+React Router v6
+Handles /sender and /viewer routes inside the same React app
+Leaflet.js
+Free map library using OpenStreetMap tiles — no API key required
+React-Leaflet
+React wrapper around Leaflet for cleaner component integration
+Socket.io-client
+WebSocket client — connects to the Node server and listens for live updates
+CSS Modules
+Scoped styling per component — no Tailwind needed for this project size
+2.2 Backend
+Technology
+Purpose / Reason
+Node.js v20 LTS
+JavaScript runtime — same language as frontend, easy to context-switch
+Express.js
+Minimal web server — serves the React build files and REST endpoints
+Socket.io
+WebSocket library — handles real-time bidirectional events between server and clients
+CORS middleware
+Allows frontend (different port in dev) to call the backend
+dotenv
+Loads environment variables (.env file) — keeps secrets out of code
+2.3 Map & Location
+API / Library
+Purpose
+Browser Geolocation API
+Built-in browser API — reads GPS on the phone, no library needed
+navigator.geolocation.watchPosition()
+Fires a callback every time GPS updates automatically
+Leaflet.js + OpenStreetMap
+Renders the map — free forever, no API key, works globally
+Polyline (Leaflet)
+Draws the route trail — connects all past GPS points on the map
+2.4 Hosting
+Service
+Role
+Railway.app
+Hosts the Node.js + Express backend — free tier supports WebSockets
+Vercel
+Hosts the React frontend (optional split) — free, instant deploys from GitHub
+GitHub
+Version control — Railway and Vercel both auto-deploy on git push
+GitHub Actions (optional)
+CI/CD pipeline — auto-run tests before deploy
+3. System Architecture
+The app uses a hub-and-spoke WebSocket model. The Node server is the hub. Both your phone (sender) and mom's browser (viewer) connect to it as spokes.
+📡  Data Flow (End-to-End)
+  [Rocky's Phone Browser]
+       ↓  watchPosition() fires every 5 sec
+       ↓  socket.emit("location", { lat, lng, timestamp })
+       ↓
+  [Node.js Server on Railway]
+       ↓  Receives event → stores last known position in memory
+       ↓  io.to(roomId).emit("location-update", data)
+       ↓
+  [Mom's Browser — Viewer Screen]
+       ↓  socket.on("location-update") fires
+       ↓  marker.setLatLng([lat, lng]) → map.panTo()
+       ↓  polyline updated → timestamp label updated
+3.1 Room-Based Isolation
+To keep your location private, both the sender and viewer join a named Socket.io "room" using a shared secret code. Nobody outside that room receives the location data.
+Concept
+Details
+Room ID
+A short random code generated when monitoring starts (e.g. "rocky-abc123")
+Sender URL
+https://your-app.up.railway.app/sender
+Viewer URL
+https://your-app.up.railway.app/viewer?room=rocky-abc123
+Sharing
+Rocky copies the viewer URL and sends it to mom via WhatsApp — one tap to open
+4. Project Folder Structure
+📁  commute-tracker/
+  ├── server/
+  │   ├── index.js          ← Express + Socket.io server (entry point)
+  │   ├── roomManager.js    ← tracks active rooms + last known locations
+  │   └── .env              ← environment variables (PORT, etc.)
+  │
+  ├── client/
+  │   ├── src/
+  │   │   ├── App.jsx              ← React Router — routes /sender and /viewer
+  │   │   ├── pages/
+  │   │   │   ├── SenderPage.jsx   ← Start/Stop button + GPS watch logic
+  │   │   │   └── ViewerPage.jsx   ← Leaflet map + Socket listener
+  │   │   ├── components/
+  │   │   │   ├── MapView.jsx      ← Leaflet map component
+  │   │   │   ├── StatusBar.jsx    ← Active / Stopped + last seen time
+  │   │   │   └── RouteTrail.jsx   ← Polyline of past coords
+  │   │   └── socket.js            ← Socket.io client singleton
+  │   ├── index.html
+  │   └── vite.config.js
+  │
+  ├── package.json           ← root — scripts to build and start everything
+  ├── .gitignore
+  └── README.md
+5. Key Code Logic
+You do not need to memorise all of this — it is here so you understand what each piece does before you write it.
+5.1 Sender — GPS Watch
+SenderPage.jsx — Start Monitoring button logic
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      socket.emit('location', { lat: latitude, lng: longitude, ts: Date.now() });
+    },
+    (error) => console.error('GPS error:', error),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+  );
+  // On Stop: navigator.geolocation.clearWatch(watchId);
+5.2 Server — Broadcast Location
+server/index.js — Socket.io event handler
+  io.on('connection', (socket) => {
+    socket.on('join-room', (roomId) => {
+      socket.join(roomId);
+    });
+    socket.on('location', (data) => {
+      const { roomId, lat, lng, ts } = data;
+      lastKnown[roomId] = { lat, lng, ts };         // store in memory
+      io.to(roomId).emit('location-update', { lat, lng, ts });  // push to viewers
+    });
+    socket.on('disconnect', () => { /* cleanup */ });
+  });
+5.3 Viewer — Live Map Update
+ViewerPage.jsx — Socket listener + Leaflet update
+  socket.on('location-update', ({ lat, lng, ts }) => {
+    if (!markerRef.current) {
+      markerRef.current = L.marker([lat, lng]).addTo(map);
+    } else {
+      markerRef.current.setLatLng([lat, lng]);
+    }
+    map.panTo([lat, lng]);
+    trailPoints.push([lat, lng]);
+    polylineRef.current.setLatLngs(trailPoints);
+    setLastSeen(new Date(ts).toLocaleTimeString());
+  });
+6. Features — Build Order
+Build these in order. Each phase is shippable on its own.
+Phase
+Feature
+Phase 1 — Core
+Start / Stop button on sender screen
+GPS reading via watchPosition()
+Socket.io emit to server
+Server broadcast to viewer room
+Live marker on Leaflet map in viewer
+Phase 2 — UX
+Route trail polyline (shows past path)
+Last seen timestamp ("Last updated: 3:42 PM")
+Active / Stopped status badge
+Auto-pan map to latest location
+Phase 3 — Polish
+Share link button (copies viewer URL to clipboard)
+"Arrived" push — status changes when movement stops
+Battery-saver mode (send every 30s instead of 5s)
+Dark mode / night theme for the map
+Phase 4 — Optional
+WhatsApp "Share location" button
+Estimated arrival time (ETA) using straight-line distance
+Custom marker icon (photo of Rocky)
+7. Development Timeline
+Estimated for a fresher working 6–8 hours a day. You can do this in one week.
+Day
+Phase
+Tasks
+Output
+Day 1
+Setup
+Create Vite React app, install Leaflet + React-Leaflet, render a basic map
+Map loads in browser
+Day 2
+Frontend UI
+Build SenderPage with Start/Stop button, build ViewerPage layout, add React Router
+Both screens navigable
+Day 3
+Backend
+Create Node server, set up Socket.io, handle join-room and location events
+Server running on localhost
+Day 4
+Wire it up
+Connect frontend Socket.io client to server, test GPS emit → broadcast → marker update
+Live tracking works locally
+Day 5
+Polish
+Add route trail, last seen timestamp, status badge, share link button
+Full feature set done
+Day 6
+Deploy
+Push to GitHub, connect Railway (backend) and Vercel (frontend), test on mobile
+Live on the internet
+Day 7
+Buffer
+Fix bugs found in real-device testing, improve mobile layout, share with mom
+Mom can use it
+8. Hosting Guide
+8.1 Why Railway for the Backend
+Feature
+Why It Matters
+WebSocket support
+Full support — essential for Socket.io (Vercel/Netlify do NOT support this)
+Free tier
+$5 credit/month — enough for a personal project with low traffic
+Auto-deploy
+Connects to GitHub — every git push auto-deploys in ~1 minute
+No cold starts
+Server stays alive unlike serverless functions — critical for WebSocket connections
+Node.js native
+Just set start command to "node server/index.js" — done
+Custom domain
+Add a custom domain for free (e.g. tracker.rocky.dev) if you want
+8.2 Deployment Strategy — Two Options
+Option A — All-in-One on Railway (Recommended for simplicity)
+  Node server serves the React build files directly.
+  One Railway project, one URL, zero CORS config needed.
+  Build step: cd client && npm run build
+  Server serves: app.use(express.static("client/dist"))
+  Result: https://commute-tracker.up.railway.app/
+          /sender → Sender screen
+          /viewer → Viewer screen
+Option B — Split Deploy (Railway backend + Vercel frontend)
+  Backend: https://commute-tracker-api.up.railway.app  (Node + Socket.io)
+  Frontend: https://commute-tracker.vercel.app          (React build)
+  Requires CORS config on the server and env variable for API URL.
+  Use this if you want Vercel's instant global CDN for the frontend.
+8.3 Step-by-Step: Deploy to Railway
+Step
+Action
+Step 1
+Push your project to GitHub (public or private repo)
+Step 2
+Go to railway.app → sign in with GitHub
+Step 3
+Click "New Project" → "Deploy from GitHub repo" → select your repo
+Step 4
+Railway auto-detects Node.js → set Start Command: node server/index.js
+Step 5
+Add environment variable: PORT = 3001 (Railway injects its own PORT too)
+Step 6
+Click "Deploy" → wait ~60 seconds → Railway gives you a public URL
+Step 7
+Open the URL in your phone and mom's phone — test the live tracking
+Step 8
+Whenever you push to GitHub → Railway redeploys automatically
+9. Environment Variables
+These variables configure the app for different environments (local dev vs production). Never commit .env to GitHub — add it to .gitignore.
+Variable
+Value & Purpose
+PORT
+3001 (local) — Railway overrides this automatically in production
+CLIENT_URL
+http://localhost:5173 (local) / https://your-app.vercel.app (prod) — used for CORS
+NODE_ENV
+"development" locally, "production" on Railway — controls logging
+ROOM_EXPIRY_MIN
+60 — how many minutes before an inactive room is cleaned up from memory
+10. Known Limitations & Solutions
+Limitation
+Notes / Workaround
+GPS accuracy in buildings
+Browser GPS uses towers + WiFi — may drift indoors. Acceptable for commute use.
+iOS background GPS
+Safari stops GPS when screen locks. Tell Rocky to keep screen on during commute.
+No data persistence
+Location history is in-memory — restarts wipe it. Add Redis later if needed.
+Single sender per room
+One sender per room in V1. Multi-sender needs room schema changes.
+Railway free tier sleep
+Railway's free plan has limits — upgrade to $5/month hobby plan if needed.
+No auth / login
+Security is a random room code. Good enough for personal use between two people.
+11. npm Packages — Full List
+Frontend (client/package.json)
+Package
+Version & Purpose
+react
+18.x — core UI library
+react-dom
+18.x — DOM renderer for React
+react-router-dom
+6.x — routing (/sender, /viewer)
+leaflet
+1.9.x — map engine
+react-leaflet
+4.x — React bindings for Leaflet
+socket.io-client
+4.x — WebSocket client
+vite (devDep)
+5.x — build tool and dev server
+@vitejs/plugin-react (devDep)
+React plugin for Vite
+Backend (server/package.json)
+Package
+Version & Purpose
+express
+4.x — web server framework
+socket.io
+4.x — WebSocket server (must match client version)
+cors
+2.x — allow cross-origin requests in development
+dotenv
+16.x — loads .env into process.env
+nodemon (devDep)
+Auto-restarts server on file change during development
+12. What to Build Next
+After the core app is working and deployed, these are high-value extensions:
+Feature
+Implementation Note
+WhatsApp notify
+Send mom a WhatsApp message with the viewer link automatically on monitoring start
+PWA
+Add a manifest.json to make the app installable on home screen (no app store)
+Push notifications
+Notify mom when Rocky starts/stops monitoring — use Web Push API
+Offline support
+Cache last location with Service Worker if connection drops temporarily
+History view
+Store route in MongoDB Atlas free tier — replay commute history
+ETA
+Calculate estimated arrival using Haversine formula (straight-line distance)
+Multiple trackers
+Track multiple family members in one dashboard — extend room model
+— End of Document —
+Prepared by Rocky · Commute Tracker v1.0 · Chennai, India · 2026

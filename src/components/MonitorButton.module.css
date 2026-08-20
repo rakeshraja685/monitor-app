@@ -1,0 +1,43 @@
+.button {
+  width: 100%;
+  height: 64px;
+  border-radius: var(--radius-card);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-md);
+  user-select: none;
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.idle {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.idle:hover {
+  background-color: var(--color-primary-dark);
+  box-shadow: var(--shadow-lg);
+}
+
+.active {
+  background-color: var(--color-danger);
+  color: #ffffff;
+}
+
+.active:hover {
+  background-color: #b91c1c;
+  box-shadow: var(--shadow-lg);
+}
+
+.symbol {
+  font-size: 16px;
+  line-height: 1;
+}

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Commute Tracker - Live Viewer</title>
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Leaflet CSS for Map -->
+<link crossorigin="" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline-variant": "#c3c6d7",
+                    "socket-green": "#25C2A0",
+                    "primary-fixed": "#dbe1ff",
+                    "surface-dim": "#d8dadc",
+                    "text-body": "#475569",
+                    "surface-container-lowest": "#ffffff",
+                    "warning": "#EA580C",
+                    "primary-container": "#2563eb",
+                    "danger": "#DC2626",
+                    "surface-container-low": "#f2f4f6",
+                    "surface-variant": "#e0e3e5",
+                    "on-primary-fixed": "#00174b",
+                    "surface-tint": "#0053db",
+                    "on-primary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "surface-container": "#eceef0",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-secondary-fixed": "#1a1c1f",
+                    "primary": "#004ac6",
+                    "inverse-on-surface": "#eff1f3",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed": "#360f00",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed-variant": "#45474a",
+                    "inverse-primary": "#b4c5ff",
+                    "background": "#f7f9fb",
+                    "outline": "#737686",
+                    "tertiary": "#943700",
+                    "on-surface-variant": "#434655",
+                    "tertiary-fixed-dim": "#ffb596",
+                    "on-background": "#191c1e",
+                    "on-secondary": "#ffffff",
+                    "surface-container-high": "#e6e8ea",
+                    "surface-bright": "#f7f9fb",
+                    "secondary": "#5d5e62",
+                    "on-surface": "#191c1e",
+                    "on-primary-container": "#eeefff",
+                    "secondary-fixed-dim": "#c6c6ca",
+                    "tertiary-fixed": "#ffdbcd",
+                    "text-main": "#1B2A4A",
+                    "secondary-fixed": "#e2e2e6",
+                    "border": "#E2E8F0",
+                    "on-tertiary-container": "#ffede6",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "on-error": "#ffffff",
+                    "success": "#16A34A",
+                    "inverse-surface": "#2d3133",
+                    "on-secondary-container": "#616366",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "on-tertiary-fixed-variant": "#7d2d00",
+                    "text-muted": "#94A3B8",
+                    "primary-dark": "#1D4ED8",
+                    "tertiary-container": "#bc4800",
+                    "surface": "#f7f9fb",
+                    "on-error-container": "#93000a",
+                    "card-surface": "#FFFFFF",
+                    "secondary-container": "#dfdfe3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "16px",
+                    "touch-target-min": "48px",
+                    "margin-desktop": "32px",
+                    "margin-mobile": "16px",
+                    "base": "4px",
+                    "action-button-height": "72px"
+            },
+            "fontFamily": {
+                    "label-caps": ["Inter"],
+                    "headline-lg-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "label-mono": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "label-caps": ["12px", {"lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["20px", {"lineHeight": "28px", "fontWeight": "700"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "label-mono": ["13px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Custom map styles to match modern aesthetic */
+        .leaflet-container { background: #f7f9fb; }
+        .leaflet-control-zoom { border: none !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important; border-radius: 0.5rem !important; overflow: hidden; }
+        .leaflet-control-zoom a { color: #1B2A4A !important; border-bottom: 1px solid #E2E8F0 !important; }
+        .leaflet-control-zoom a:hover { background-color: #f2f4f6 !important; }
+        
+        /* Marker Pulse Animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            80% { transform: scale(2.5); opacity: 0; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+        .live-marker-icon { position: relative; }
+        .live-marker-dot { width: 16px; height: 16px; background-color: #2563eb; border-radius: 50%; border: 3px solid #ffffff; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .live-marker-pulse { width: 32px; height: 32px; background-color: #2563eb; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex flex-col h-screen overflow-hidden antialiased">
+<!-- TopNavBar (Rendered exactly from JSON specifications) -->
+<header class="bg-surface docked full-width top-0 sticky border-b border-border h-[56px] flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full z-50">
+<div class="font-headline-md text-headline-md font-bold text-primary">Commute Tracker</div>
+<div class="flex items-center gap-2">
+<!-- Simulated Active Interaction on first trailing icon -->
+<button aria-label="sensors" class="text-on-surface-variant hover:bg-surface-container transition-colors w-[48px] h-[48px] flex items-center justify-center rounded-full opacity-80 scale-95">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">sensors</span>
+</button>
+<button aria-label="share" class="text-on-surface-variant hover:bg-surface-container transition-colors w-[48px] h-[48px] flex items-center justify-center rounded-full">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">share</span>
+</button>
+</div>
+</header>
+<!-- Main Content Area: Map and Overlays -->
+<main class="relative w-full flex-grow flex flex-col" style="height: calc(100vh - 56px - 120px);">
+<!-- Leaflet Map Container -->
+<div class="absolute inset-0 z-0 bg-surface-container-low" id="map"></div>
+<!-- Waiting Overlay Card (Glassmorphism inspired) -->
+<div class="absolute inset-0 z-20 flex items-center justify-center bg-surface/40 backdrop-blur-[2px] transition-opacity duration-500" id="status-overlay">
+<div class="bg-card-surface/95 backdrop-blur-md border border-border shadow-lg rounded-xl p-8 flex flex-col items-center max-w-[320px] w-[90%] text-center">
+<div class="relative w-12 h-12 mb-4">
+<div class="absolute inset-0 border-4 border-surface-container rounded-full"></div>
+<div class="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
+</div>
+<h2 class="font-headline-md text-headline-md text-text-main mb-2">Waiting for Rocky...</h2>
+<p class="font-body-sm text-body-sm text-text-muted">Establishing secure connection to location stream.</p>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom Panel -->
+<div class="fixed bottom-0 left-0 w-full h-[120px] bg-card-surface border-t border-border shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] z-40 px-margin-mobile md:px-margin-desktop py-4 flex flex-col justify-between">
+<!-- Top row of panel -->
+<div class="flex justify-between items-start w-full">
+<div class="flex flex-col gap-1">
+<!-- Status Badge -->
+<div class="flex items-center">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 text-warning font-label-caps text-label-caps transition-colors duration-300" id="ui-status-badge">
+<span class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" id="ui-status-dot"></span>
+<span id="ui-status-text">WAITING</span>
+</span>
+</div>
+<!-- Last Updated -->
+<div class="font-body-sm text-body-sm text-text-muted mt-1">
+                    Updated: <span class="font-label-mono text-label-mono text-text-main ml-1" id="ui-last-updated">--:--:--</span>
+</div>
+</div>
+<!-- Distance Metric -->
+<div class="flex flex-col items-end">
+<span class="font-body-sm text-body-sm text-text-muted">Distance</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-text-main font-bold" id="ui-distance">0.00</span>
+<span class="font-body-sm text-body-sm text-text-muted">km</span>
+</div>
+</div>
+</div>
+<!-- Bottom row of panel: Coordinates & Action -->
+<div class="flex justify-between items-center w-full pt-3 border-t border-surface-container-highest mt-2">
+<div class="flex items-center gap-2 text-text-muted">
+<span class="material-symbols-outlined text-[16px]">my_location</span>
+<span class="font-label-mono text-label-mono text-text-main text-[12px] opacity-80" id="ui-coordinates">--.----, --.----</span>
+</div>
+<button aria-label="Recenter Map" class="w-[40px] h-[40px] bg-surface-container hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center shadow-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled="" id="btn-recenter">
+<span class="material-symbols-outlined text-text-main text-[20px]">explore</span>
+</button>
+</div>
+</div>
+<!-- Leaflet JS for Map functionality -->
+<script crossorigin="" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Initialize Map (Centered roughly on a generic city initially)
+            const map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([40.7128, -74.0060], 13); // Default NYC placeholder
+
+            // Minimalist map tiles (CartoDB Positron for light clean look)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // 2. Setup Map Elements for Tracking
+            let currentMarker = null;
+            let routePolyline = L.polyline([], { color: '#2563eb', weight: 4, opacity: 0.7, smoothFactor: 1 }).addTo(map);
+            
+            // Custom Icon HTML
+            const liveIcon = L.divIcon({
+                className: 'live-marker-icon',
+                html: '<div class="live-marker-pulse"></div><div class="live-marker-dot"></div>',
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+
+            // 3. UI Elements References
+            const overlay = document.getElementById('status-overlay');
+            const badge = document.getElementById('ui-status-badge');
+            const badgeDot = document.getElementById('ui-status-dot');
+            const badgeText = document.getElementById('ui-status-text');
+            const distanceEl = document.getElementById('ui-distance');
+            const coordsEl = document.getElementById('ui-coordinates');
+            const timeEl = document.getElementById('ui-last-updated');
+            const btnRecenter = document.getElementById('btn-recenter');
+
+            let isTracking = false;
+            let totalDistance = 0;
+            let lastLatLng = null;
+            let autoPan = true;
+
+            // 4. Simulation Logic (Mocking Socket Events)
+            
+            // Simulated route points
+            const simulatedRoute = [
+                [40.7128, -74.0060], [40.7135, -74.0050], [40.7142, -74.0040],
+                [40.7150, -74.0025], [40.7160, -74.0010], [40.7170, -73.9995]
+            ];
+            let stepIndex = 0;
+
+            function updateUIState(state) {
+                if (state === 'active') {
+                    overlay.classList.add('opacity-0');
+                    setTimeout(() => overlay.classList.add('hidden'), 500);
+                    
+                    badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-socket-green/10 text-socket-green font-label-caps text-label-caps transition-colors duration-300';
+                    badgeDot.className = 'w-1.5 h-1.5 rounded-full bg-socket-green animate-pulse';
+                    badgeText.textContent = 'LIVE';
+                    
+                    btnRecenter.disabled = false;
+                    isTracking = true;
+                }
+            }
+
+            // Calculate mock distance
+            function calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371; // km
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            }
+
+            function handleLocationUpdate(lat, lng) {
+                const latLng = [lat, lng];
+                
+                // Update Route
+                routePolyline.addLatLng(latLng);
+
+                // Update Marker
+                if (!currentMarker) {
+                    currentMarker = L.marker(latLng, { icon: liveIcon }).addTo(map);
+                    map.setView(latLng, 16);
+                } else {
+                    currentMarker.setLatLng(latLng);
+                    if (autoPan) map.panTo(latLng);
+                }
+
+                // Update Distance
+                if (lastLatLng) {
+                    totalDistance += calculateDistance(lastLatLng[0], lastLatLng[1], lat, lng);
+                    distanceEl.textContent = totalDistance.toFixed(2);
+                }
+                lastLatLng = latLng;
+
+                // Update Text Data
+                coordsEl.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                
+                const now = new Date();
+                timeEl.textContent = now.toLocaleTimeString([], { hour12: false });
+            }
+
+            // Start Simulation after initial delay
+            setTimeout(() => {
+                updateUIState('active');
+                
+                // Simulate receiving initial position
+                handleLocationUpdate(simulatedRoute[0][0], simulatedRoute[0][1]);
+
+                // Simulate ongoing updates
+                const trackingInterval = setInterval(() => {
+                    stepIndex++;
+                    if (stepIndex < simulatedRoute.length) {
+                        handleLocationUpdate(simulatedRoute[stepIndex][0], simulatedRoute[stepIndex][1]);
+                    } else {
+                        // End of simulated route
+                        clearInterval(trackingInterval);
+                        badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-variant text-on-surface-variant font-label-caps text-label-caps transition-colors duration-300';
+                        badgeDot.className = 'hidden';
+                        badgeText.textContent = 'ARRIVED';
+                        document.querySelector('.live-marker-pulse').style.display = 'none'; // stop pulsing
+                    }
+                }, 3000);
+
+            }, 2500); // 2.5s waiting overlay
+
+            // Interaction logic
+            map.on('dragstart', () => { autoPan = false; });
+            
+            btnRecenter.addEventListener('click', () => {
+                if (lastLatLng) {
+                    map.setView(lastLatLng, 16, { animate: true });
+                    autoPan = true;
+                }
+            });
+        });
+    </script>
+</body></html>

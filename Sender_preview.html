@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Commute Tracker - Sender</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline-variant": "#c3c6d7",
+                        "socket-green": "#25C2A0",
+                        "primary-fixed": "#dbe1ff",
+                        "surface-dim": "#d8dadc",
+                        "text-body": "#475569",
+                        "surface-container-lowest": "#ffffff",
+                        "warning": "#EA580C",
+                        "primary-container": "#2563eb",
+                        "danger": "#DC2626",
+                        "surface-container-low": "#f2f4f6",
+                        "surface-variant": "#e0e3e5",
+                        "on-primary-fixed": "#00174b",
+                        "surface-tint": "#0053db",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#eceef0",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-secondary-fixed": "#1a1c1f",
+                        "primary": "#004ac6",
+                        "inverse-on-surface": "#eff1f3",
+                        "error": "#ba1a1a",
+                        "on-tertiary-fixed": "#360f00",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#45474a",
+                        "inverse-primary": "#b4c5ff",
+                        "background": "#f7f9fb",
+                        "outline": "#737686",
+                        "tertiary": "#943700",
+                        "on-surface-variant": "#434655",
+                        "tertiary-fixed-dim": "#ffb596",
+                        "on-background": "#191c1e",
+                        "on-secondary": "#ffffff",
+                        "surface-container-high": "#e6e8ea",
+                        "surface-bright": "#f7f9fb",
+                        "secondary": "#5d5e62",
+                        "on-surface": "#191c1e",
+                        "on-primary-container": "#eeefff",
+                        "secondary-fixed-dim": "#c6c6ca",
+                        "tertiary-fixed": "#ffdbcd",
+                        "text-main": "#1B2A4A",
+                        "secondary-fixed": "#e2e2e6",
+                        "border": "#E2E8F0",
+                        "on-tertiary-container": "#ffede6",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "on-error": "#ffffff",
+                        "success": "#16A34A",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#616366",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "on-tertiary-fixed-variant": "#7d2d00",
+                        "text-muted": "#94A3B8",
+                        "primary-dark": "#1D4ED8",
+                        "tertiary-container": "#bc4800",
+                        "surface": "#f7f9fb",
+                        "on-error-container": "#93000a",
+                        "card-surface": "#FFFFFF",
+                        "secondary-container": "#dfdfe3"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "touch-target-min": "48px",
+                        "margin-desktop": "32px",
+                        "margin-mobile": "16px",
+                        "base": "4px",
+                        "action-button-height": "72px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-mono": ["JetBrains Mono"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["20px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-mono": ["13px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #e0e3e5; /* surface-variant backdrop for mobile frame */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+
+        #mobile-frame {
+            width: 100%;
+            max-width: 420px;
+            background-color: #f7f9fb; /* surface */
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        @media (min-width: 421px) {
+            #mobile-frame {
+                min-height: 850px;
+                height: 90vh;
+                margin-top: 5vh;
+                border-radius: 2rem;
+                overflow: hidden;
+                border: 8px solid #1a1c1f;
+            }
+        }
+
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #2563eb;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #2563eb;
+        }
+
+        #toast-container {
+            position: absolute;
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background-color: #191c1e;
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 194, 160, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(37, 194, 160, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 194, 160, 0); }
+        }
+    </style>
+</head>
+<body class="antialiased text-on-surface">
+<div id="mobile-frame">
+<!-- TopNavBar -->
+<header class="h-[56px] flex justify-between items-center px-margin-mobile w-full z-50 bg-surface border-b border-border sticky top-0">
+<div class="flex items-center gap-3">
+<span class="font-headline-md text-headline-md font-bold text-primary tracking-tight">Commute Tracker</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="bg-surface-container-high px-3 py-1.5 rounded-full flex items-center gap-2 border border-border">
+<span class="font-label-mono text-label-mono text-on-surface-variant select-all" id="room-code-display">RTX-90</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-socket-green/20 flex items-center justify-center pulse-animation" id="connection-indicator">
+<span class="material-symbols-outlined text-[16px] text-socket-green" style="font-variation-settings: 'FILL' 1;">sensors</span>
+</div>
+</div>
+</header>
+<div id="toast-container"></div>
+<!-- Main Content Canvas -->
+<main class="flex-1 overflow-y-auto px-margin-mobile py-6 flex flex-col gap-6">
+<!-- Map Preview Area -->
+<div class="w-full h-[240px] bg-surface-container rounded-xl relative overflow-hidden border border-border flex items-center justify-center shadow-sm">
+<!-- Using placeholder for map as requested, though an actual map would be better suited here -->
+<img class="absolute inset-0 w-full h-full object-cover opacity-60" data-alt="A clean, minimalist 2D digital map interface centered on an urban grid layout. The map uses a light-mode color palette with subtle gray roads on a pale off-white background. A vibrant blue location dot sits in the center with a soft glowing halo indicating precision. The overall aesthetic is functional, modern, and highly legible, suitable for a professional tracking application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeMrOIKehLpMAIj8IzMN652qXwNsIz-X7u7kXQOM5QOMNBx1BzTw2K4Bm6jqJKP54zNPzLCBJFSweZLvEDVS7mvLjA-2NHzcJLdqoRjn4werihTEmWquZJvjlzTZWz8mbI6L98AsIS43kQdw7O0nMba2IHqBMBRbg6p8N3Mu8UCGlMjshthxcZ33e9YO6U0Bq3e7Z3hyMCUNE3oSmxNz9QEfUCtvPmo-Dzcdyl-zwb-Rd7E5RCZlwG"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface/80 to-transparent"></div>
+<!-- Center Marker -->
+<div class="z-10 bg-primary w-12 h-12 rounded-full shadow-lg flex items-center justify-center border-4 border-surface pulse-animation" id="map-marker">
+<span class="material-symbols-outlined text-on-primary" data-icon="location_on" data-weight="fill" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<!-- GPS Accuracy Overlay -->
+<div class="absolute top-4 left-4">
+<div class="bg-card-surface/90 backdrop-blur border border-socket-green/30 text-socket-green font-label-caps text-label-caps px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1.5" id="gps-accuracy">
+<span class="w-2 h-2 rounded-full bg-socket-green block"></span>
+                        GPS: 12m
+                    </div>
+</div>
+</div>
+<!-- Main Control Card -->
+<div class="bg-card-surface rounded-xl border border-border p-5 shadow-sm flex flex-col gap-5">
+<div class="flex flex-col gap-1 items-center justify-center text-center">
+<div class="font-body-sm text-body-sm text-text-muted flex items-center gap-2" id="status-text">
+<span class="w-2 h-2 rounded-full bg-secondary block"></span>
+                        ⚫ Stopped — Ready to monitor
+                    </div>
+<div class="font-label-mono text-label-mono text-on-surface-variant bg-surface-container-low px-3 py-1 rounded-md mt-2 border border-border/50">
+                        📍 <span id="coordinates-display">12.9716° N, 80.2209° E</span>
+</div>
+</div>
+<button class="w-full h-action-button-height bg-primary text-on-primary rounded-xl font-headline-md text-headline-md shadow-md hover:bg-primary-dark transition-all duration-200 active:scale-[0.98] active:shadow-inner flex items-center justify-center gap-3" id="main-action-btn">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                    Start Monitoring
+                </button>
+<div class="h-[1px] w-full bg-border my-1"></div>
+<div class="flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Share Live Location</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[12px]">Viewers need this link to track you</span>
+</div>
+<button class="h-10 px-4 border border-outline text-primary font-body-sm text-body-sm font-semibold rounded-lg hover:bg-surface-container-low transition-colors flex items-center gap-2 active:bg-surface-container" id="copy-link-btn">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+                            Copy
+                        </button>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-semibold text-on-surface">Battery Saver</span>
+<span class="font-body-sm text-body-sm text-text-muted text-[12px]">Reduces GPS update frequency</span>
+</div>
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-outline-variant z-10 top-0 left-0 transition-all duration-300" id="battery-toggle" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-high cursor-pointer transition-colors duration-300" for="battery-toggle"></label>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-[72px] px-gutter pb-safe md:hidden bg-card-surface shadow-[0_-4px_10px_rgba(0,0,0,0.05)] rounded-t-xl absolute">
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-6 py-2 transition-transform scale-90">
+<span class="material-symbols-outlined text-[24px]" data-icon="radar" data-weight="fill" style="font-variation-settings: 'FILL' 1;">radar</span>
+<span class="font-label-caps text-label-caps mt-1">Monitor</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-2xl px-4 py-2 transition-colors">
+<span class="material-symbols-outlined text-[24px]" data-icon="info">info</span>
+<span class="font-label-caps text-label-caps mt-1">Status</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-2xl px-4 py-2 transition-colors">
+<span class="material-symbols-outlined text-[24px]" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps mt-1">Settings</span>
+</button>
+</nav>
+<!-- Desktop SideNav Placeholder for structural integrity if resized -->
+<div class="hidden md:block absolute left-full w-0 overflow-hidden">
+<!-- SideNav structural shell omitted as this is strictly a mobile frame simulation -->
+</div>
+</div>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnMain = document.getElementById('main-action-btn');
+            const statusText = document.getElementById('status-text');
+            const mapMarker = document.getElementById('map-marker');
+            const btnCopy = document.getElementById('copy-link-btn');
+            const toastContainer = document.getElementById('toast-container');
+            const roomCodeDisplay = document.getElementById('room-code-display');
+            
+            let isMonitoring = false;
+            let monitoringInterval;
+            
+            // Generate a random room code on load
+            const generateRoomCode = () => {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let code = '';
+                for(let i=0; i<3; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+                code += '-';
+                for(let i=0; i<2; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+                return code;
+            };
+            
+            roomCodeDisplay.textContent = generateRoomCode();
+
+            function showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'toast';
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                
+                // Trigger reflow
+                void toast.offsetWidth;
+                
+                toast.classList.add('show');
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => {
+                        toast.remove();
+                    }, 300);
+                }, 3000);
+            }
+
+            function formatTime(date) {
+                return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            }
+
+            btnMain.addEventListener('click', () => {
+                isMonitoring = !isMonitoring;
+                const now = new Date();
+                
+                if (isMonitoring) {
+                    btnMain.classList.remove('bg-primary', 'hover:bg-primary-dark', 'text-on-primary');
+                    btnMain.classList.add('bg-error', 'hover:bg-error-container', 'hover:text-on-error-container', 'text-on-error');
+                    btnMain.innerHTML = `<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">stop_circle</span> Stop Monitoring`;
+                    
+                    statusText.innerHTML = `<span class="w-2 h-2 rounded-full bg-socket-green block"></span> 🟢 Monitoring Active — started at ${formatTime(now)}`;
+                    statusText.classList.remove('text-text-muted');
+                    statusText.classList.add('text-socket-green');
+                    
+                    mapMarker.classList.add('pulse-animation');
+                    showToast("Monitoring Started");
+                    
+                    // Simulate coordinate updates
+                    monitoringInterval = setInterval(() => {
+                        const coords = document.getElementById('coordinates-display');
+                        const lat = (12.9716 + (Math.random() * 0.001 - 0.0005)).toFixed(4);
+                        const lng = (80.2209 + (Math.random() * 0.001 - 0.0005)).toFixed(4);
+                        coords.textContent = `${lat}° N, ${lng}° E`;
+                    }, 3000);
+                    
+                } else {
+                    btnMain.classList.remove('bg-error', 'hover:bg-error-container', 'hover:text-on-error-container', 'text-on-error');
+                    btnMain.classList.add('bg-primary', 'hover:bg-primary-dark', 'text-on-primary');
+                    btnMain.innerHTML = `<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_circle</span> Start Monitoring`;
+                    
+                    statusText.innerHTML = `<span class="w-2 h-2 rounded-full bg-secondary block"></span> ⚫ Stopped — last sent at ${formatTime(now)}`;
+                    statusText.classList.remove('text-socket-green');
+                    statusText.classList.add('text-text-muted');
+                    
+                    mapMarker.classList.remove('pulse-animation');
+                    showToast("Monitoring Stopped");
+                    clearInterval(monitoringInterval);
+                }
+            });
+
+            btnCopy.addEventListener('click', () => {
+                const dummyLink = `https://commutetracker.app/view/${roomCodeDisplay.textContent}`;
+                navigator.clipboard.writeText(dummyLink).then(() => {
+                    showToast("Link Copied!");
+                }).catch(err => {
+                    showToast("Failed to copy link");
+                });
+            });
+            
+            // Battery saver toggle simulation
+            document.getElementById('battery-toggle').addEventListener('change', (e) => {
+                if(e.target.checked) {
+                    showToast("Battery Saver ON - Update frequency reduced");
+                }
+            });
+        });
+    </script>
+</body></html>
