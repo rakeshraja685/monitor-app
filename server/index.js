@@ -70,24 +70,39 @@ io.on('connection', (socket) => {
     if (!roomId) return;
 
     socket.join(roomId);
-    roomManager.joinRoom(roomId, role, socket.id);
+    const room = roomManager.joinRoom(roomId, role, socket.id);
     console.log(`[Socket] ${socket.id} (${role}) joined room: ${roomId}`);
 
-    // If viewer joins late and we have a last known location, emit it immediately
+    const snapshot = roomManager.getRoomSnapshot(roomId);
+
     if (role === 'viewer') {
-      const lastKnown = roomManager.getLastKnown(roomId);
-      if (lastKnown) {
-        socket.emit('last-known', lastKnown);
+      // Send full initial state to viewer immediately
+      socket.emit('room-init', snapshot);
+      if (snapshot && snapshot.lastKnown) {
+        socket.emit('last-known', { ...snapshot.lastKnown, trail: snapshot.trail });
       }
+      // Inform sender about viewer count
+      io.to(roomId).emit('viewer-count', snapshot ? snapshot.viewerCount : 1);
+    } else if (role === 'sender') {
+      // Inform viewers in the room that sender has connected
+      io.to(roomId).emit('sender-status', { connected: true, status: room ? room.status : 'waiting' });
     }
+  });
+
+  // Handle sender starting tracking
+  socket.on('monitoring-started', ({ roomId }) => {
+    if (!roomId) return;
+    console.log(`[Socket] Monitoring started for room: ${roomId}`);
+    roomManager.startMonitoring(roomId);
+    io.to(roomId).emit('monitoring-started', { roomId });
   });
 
   // Handle live location broadcasting
   socket.on('location', (data) => {
-    const { roomId, lat, lng, ts = Date.now(), accuracy, speed } = data || {};
+    const { roomId, lat, lng, ts = Date.now(), accuracy, speed, heading } = data || {};
     if (!roomId || lat === undefined || lng === undefined) return;
 
-    const cleanData = roomManager.updateLocation(roomId, { lat, lng, ts, accuracy, speed });
+    const cleanData = roomManager.updateLocation(roomId, { lat, lng, ts, accuracy, speed, heading });
     if (cleanData) {
       // Broadcast location update to all clients in the room
       io.to(roomId).emit('location-update', cleanData);
@@ -105,7 +120,15 @@ io.on('connection', (socket) => {
   // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
-    roomManager.handleDisconnect(socket.id);
+    const info = roomManager.handleDisconnect(socket.id);
+    if (info && info.role === 'sender') {
+      io.to(info.roomId).emit('sender-status', { connected: false });
+    } else if (info && info.role === 'viewer') {
+      const snap = roomManager.getRoomSnapshot(info.roomId);
+      if (snap) {
+        io.to(info.roomId).emit('viewer-count', snap.viewerCount);
+      }
+    }
   });
 });
 

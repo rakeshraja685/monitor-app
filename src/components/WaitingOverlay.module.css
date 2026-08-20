@@ -23,11 +23,30 @@
   text-align: center;
 }
 
-.card p {
-  font-size: 15px;
-  font-weight: 600;
+.title {
+  font-size: 16px;
+  font-weight: 700;
   color: var(--color-text-main);
   margin: 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-body);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 280px;
+}
+
+.roomTag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
 }
 
 .spinner {

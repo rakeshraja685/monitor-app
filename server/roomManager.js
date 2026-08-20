@@ -39,13 +39,25 @@ class RoomManager {
 
     if (role === 'sender') {
       room.senderSocketId = socketId;
-      room.status = 'active';
     } else {
       room.viewerSocketIds.add(socketId);
     }
 
     room.lastUpdated = Date.now();
     this.socketToRoom.set(socketId, { roomId, role });
+    return room;
+  }
+
+  /**
+   * Marks a session as actively monitoring
+   * @param {string} roomId 
+   */
+  startMonitoring(roomId) {
+    const room = this.rooms.get(roomId);
+    if (room) {
+      room.status = 'active';
+      room.lastUpdated = Date.now();
+    }
     return room;
   }
 
@@ -58,8 +70,8 @@ class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return null;
 
-    const { lat, lng, ts = Date.now(), accuracy, speed } = locationData;
-    const cleanLocation = { lat, lng, ts, accuracy, speed };
+    const { lat, lng, ts = Date.now(), accuracy, speed, heading } = locationData;
+    const cleanLocation = { lat, lng, ts, accuracy, speed, heading };
 
     room.lastKnown = cleanLocation;
     room.status = 'active';
@@ -88,6 +100,23 @@ class RoomManager {
   }
 
   /**
+   * Retrieves complete snapshot for initial viewer state
+   * @param {string} roomId 
+   */
+  getRoomSnapshot(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+    return {
+      roomId: room.roomId,
+      status: room.status,
+      lastKnown: room.lastKnown,
+      trail: room.trail,
+      senderConnected: !!room.senderSocketId,
+      viewerCount: room.viewerSocketIds.size
+    };
+  }
+
+  /**
    * Retrieves last known location for a room
    * @param {string} roomId 
    */
@@ -110,7 +139,7 @@ class RoomManager {
    */
   handleDisconnect(socketId) {
     const info = this.socketToRoom.get(socketId);
-    if (!info) return;
+    if (!info) return null;
 
     const { roomId, role } = info;
     const room = this.rooms.get(roomId);
@@ -122,6 +151,7 @@ class RoomManager {
       }
     }
     this.socketToRoom.delete(socketId);
+    return { roomId, role };
   }
 
   /**

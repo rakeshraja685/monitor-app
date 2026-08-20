@@ -10,9 +10,11 @@ import styles from './ViewerPage.module.css';
 
 const ViewerPage = () => {
   const [searchParams] = useSearchParams();
-  const roomId = searchParams.get('room');
+  const rawRoomId = searchParams.get('room');
+  const roomId = rawRoomId ? rawRoomId.toUpperCase() : null;
   
   const [status, setStatus] = useState('waiting');
+  const [senderOnline, setSenderOnline] = useState(false);
   const [lastCoords, setLastCoords] = useState(null);
   const [lastSeen, setLastSeen] = useState(null);
   const [trailPoints, setTrailPoints] = useState([]);
@@ -53,8 +55,34 @@ const ViewerPage = () => {
   useEffect(() => {
     if (!roomId) return;
 
-    // Join the specified room as a viewer
-    socket.emit('join-room', { roomId, role: 'viewer' });
+    const join = () => {
+      socket.emit('join-room', { roomId, role: 'viewer' });
+    };
+
+    if (socket.connected) {
+      join();
+    }
+    socket.on('connect', join);
+
+    const handleRoomInit = (snapshot) => {
+      if (!snapshot) return;
+      setSenderOnline(!!snapshot.senderConnected);
+      
+      if (snapshot.lastKnown) {
+        const { lat, lng, ts, accuracy, speed, heading } = snapshot.lastKnown;
+        setLastCoords({ lat, lng, accuracy, speed, heading });
+        setLastSeen(new Date(ts || Date.now()));
+        setStatus('active');
+        if (snapshot.trail && snapshot.trail.length > 0) {
+          setTrailPoints(snapshot.trail);
+          const start = snapshot.trail[0];
+          setDistanceKm(calculateDistance(start[0], start[1], lat, lng));
+        }
+        resetStationaryTimer();
+      } else if (snapshot.status) {
+        setStatus(snapshot.status);
+      }
+    };
 
     const handleLocationUpdate = (data) => {
       const { lat, lng, ts = Date.now(), accuracy, speed, heading } = data || {};
@@ -64,6 +92,7 @@ const ViewerPage = () => {
       setLastCoords({ lat, lng, accuracy, speed, heading });
       setLastSeen(new Date(ts));
       setStatus('active');
+      setSenderOnline(true);
       
       setTrailPoints(prev => {
         const nextTrail = [...prev, newPoint];
@@ -78,43 +107,63 @@ const ViewerPage = () => {
       resetStationaryTimer();
     };
 
+    const handleMonitoringStarted = () => {
+      setSenderOnline(true);
+      addToast('🚀 Rocky started monitoring! Waiting for first GPS ping...', 'info');
+    };
+
     const handleMonitoringStopped = () => {
       setStatus('stopped');
       if (stationaryTimerRef.current) clearTimeout(stationaryTimerRef.current);
       addToast('⚫ Monitoring Ended by Sender', 'info');
     };
 
+    const handleSenderStatus = (info) => {
+      setSenderOnline(!!info?.connected);
+      if (info?.connected) {
+        addToast('🟢 Rocky is online', 'info');
+      }
+    };
+
     const handleLastKnown = (data) => {
       if (data && data.lat !== undefined && data.lng !== undefined) {
-        const { lat, lng, ts, accuracy, speed, heading } = data;
+        const { lat, lng, ts, accuracy, speed, heading, trail } = data;
         setLastCoords({ lat, lng, accuracy, speed, heading });
         setLastSeen(new Date(ts || Date.now()));
         setStatus('active');
-        setTrailPoints([[lat, lng]]);
+        setSenderOnline(true);
+        if (trail && trail.length > 0) {
+          setTrailPoints(trail);
+        } else {
+          setTrailPoints(prev => prev.length > 0 ? prev : [[lat, lng]]);
+        }
         resetStationaryTimer();
       }
     };
 
     const handleReconnect = () => {
       addToast('🔁 Reconnected to live stream', 'success');
-      socket.emit('join-room', { roomId, role: 'viewer' });
+      join();
     };
 
+    socket.on('room-init', handleRoomInit);
     socket.on('location-update', handleLocationUpdate);
+    socket.on('monitoring-started', handleMonitoringStarted);
     socket.on('monitoring-stopped', handleMonitoringStopped);
+    socket.on('sender-status', handleSenderStatus);
     socket.on('last-known', handleLastKnown);
-    socket.on('connect', () => {
-      socket.emit('join-room', { roomId, role: 'viewer' });
-    });
     socket.on('reconnect', handleReconnect);
 
     return () => {
       if (stationaryTimerRef.current) clearTimeout(stationaryTimerRef.current);
+      socket.off('connect', join);
+      socket.off('room-init', handleRoomInit);
       socket.off('location-update', handleLocationUpdate);
+      socket.off('monitoring-started', handleMonitoringStarted);
       socket.off('monitoring-stopped', handleMonitoringStopped);
+      socket.off('sender-status', handleSenderStatus);
       socket.off('last-known', handleLastKnown);
-      socket.off('connect');
-      socket.off('reconnect');
+      socket.off('reconnect', handleReconnect);
     };
   }, [roomId]);
 
@@ -139,7 +188,9 @@ const ViewerPage = () => {
           trail={trailPoints} 
           lastSeen={lastSeen}
         />
-        {status === 'waiting' && <WaitingOverlay />}
+        {status === 'waiting' && (
+          <WaitingOverlay roomId={roomId} senderOnline={senderOnline} />
+        )}
       </div>
 
       <BottomInfoPanel 

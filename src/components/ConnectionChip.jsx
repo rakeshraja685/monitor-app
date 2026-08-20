@@ -3,21 +3,24 @@ import socket from '../socket';
 import styles from './ConnectionChip.module.css';
 
 const ConnectionChip = () => {
-  const [status, setStatus] = useState('connected');
+  const [status, setStatus] = useState(() => (socket.connected ? 'connected' : 'reconnecting'));
 
   useEffect(() => {
     const handleConnect = () => setStatus('connected');
     const handleDisconnect = () => setStatus('disconnected');
     const handleReconnect = () => setStatus('reconnecting');
+    const handleError = () => setStatus('disconnected');
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('reconnect_attempt', handleReconnect);
+    socket.on('connect_error', handleError);
 
     return () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('reconnect_attempt', handleReconnect);
+      socket.off('connect_error', handleError);
     };
   }, []);
 

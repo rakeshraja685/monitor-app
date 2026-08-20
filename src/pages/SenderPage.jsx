@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import socket from '../socket';
 import AppHeader from '../components/AppHeader';
 import MonitorButton from '../components/MonitorButton';
@@ -9,6 +10,18 @@ import { GPSKalmanFilter } from '../utils/kalmanFilter';
 import styles from './SenderPage.module.css';
 
 const SenderPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const [roomId, setRoomId] = useState(() => {
+    const urlRoom = searchParams.get('room');
+    if (urlRoom) return urlRoom.toUpperCase();
+    const stored = localStorage.getItem('commute_sender_room');
+    if (stored) return stored.toUpperCase();
+    const generated = Math.random().toString(36).substring(2, 8).toUpperCase();
+    localStorage.setItem('commute_sender_room', generated);
+    return generated;
+  });
+
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [currentCoords, setCurrentCoords] = useState(null);
   const [accuracy, setAccuracy] = useState(null);
@@ -17,11 +30,42 @@ const SenderPage = () => {
   const [startTime, setStartTime] = useState(null);
   const [lastSentTime, setLastSentTime] = useState(null);
   const [gpsError, setGpsError] = useState(null);
-  const [roomId] = useState(() => Math.random().toString(36).substring(2, 8).toUpperCase());
+  const [viewerCount, setViewerCount] = useState(0);
   const [toasts, setToasts] = useState([]);
   
   const watchId = useRef(null);
   const kalmanFilter = useRef(new GPSKalmanFilter(2.5));
+
+  // Sync Room ID with URL and localStorage
+  useEffect(() => {
+    localStorage.setItem('commute_sender_room', roomId);
+    if (searchParams.get('room') !== roomId) {
+      setSearchParams({ room: roomId }, { replace: true });
+    }
+  }, [roomId, searchParams, setSearchParams]);
+
+  // Join room as sender immediately on mount and on reconnect
+  useEffect(() => {
+    const join = () => {
+      socket.emit('join-room', { roomId, role: 'sender' });
+    };
+
+    if (socket.connected) {
+      join();
+    }
+    socket.on('connect', join);
+
+    const handleViewerCount = (count) => {
+      setViewerCount(count || 0);
+    };
+
+    socket.on('viewer-count', handleViewerCount);
+
+    return () => {
+      socket.off('connect', join);
+      socket.off('viewer-count', handleViewerCount);
+    };
+  }, [roomId]);
 
   const addToast = (message, type = 'info') => {
     const id = Date.now();
@@ -46,6 +90,7 @@ const SenderPage = () => {
       kalmanFilter.current.reset();
       
       socket.emit('join-room', { roomId, role: 'sender' });
+      socket.emit('monitoring-started', { roomId });
       addToast('📍 High-Precision GPS Started', 'success');
 
       // Request continuous high-accuracy position updates
@@ -195,6 +240,12 @@ const SenderPage = () => {
         {isMonitoring && (
           <div className={styles.screenWarning}>
             🛰️ <strong>GPS Optimization:</strong> Utilizing hardware GNSS with active Kalman noise filtering. Keep screen unlocked for uninterrupted tracking.
+          </div>
+        )}
+
+        {viewerCount > 0 && (
+          <div className={styles.viewerCountChip}>
+            👁️ <strong>{viewerCount}</strong> {viewerCount === 1 ? 'person watching live' : 'people watching live'}
           </div>
         )}
 
